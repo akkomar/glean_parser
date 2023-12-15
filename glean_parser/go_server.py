@@ -54,22 +54,14 @@ def generate_metric_argument_name(metric: metrics.Metric) -> str:
     return f"{util.Camelize(metric.category)}{util.Camelize(metric.name)}"
 
 
-def generate_metric_type(metric: metrics.Metric) -> str:
-    if metric.type == "quantity":
+def generate_metric_type(metric_type: str) -> str:
+    if metric_type == "quantity":
         return "int64"
-    elif metric.type == "string":
+    elif metric_type == "string":
         return "string"
     else:
         print("❌ Unable to generate Go type from metric type: " + metric.type)
         exit
-
-
-def generate_ping_factory_method(ping: str, event_metric_exists: bool) -> str:
-    # `ServerEventLogger` better describes role of the class that this factory
-    # method generates, but for compatibility with existing FxA codebase
-    # we use `Event` suffix if no event metrics are defined.
-    suffix = "ServerEventLogger" if event_metric_exists else "Event"
-    return f"create{util.Camelize(ping)}{suffix}"
 
 
 def clean_string(s: str) -> str:
@@ -82,7 +74,7 @@ def output_go(
     options: Optional[Dict[str, Any]]
 ) -> None:
     """
-    Given a tree of objects, output Javascript or Typescript code to `output_dir`.
+    Given a tree of objects, output Go code to `output_dir`.
 
     The output is a single file containing all the code for assembling pings with
     metrics, serializing, and submitting.
@@ -101,7 +93,6 @@ def output_go(
             ("metric_name", generate_metric_name),
             ("metric_argument_name", generate_metric_argument_name),
             ("go_metric_type", generate_metric_type),
-            ("factory_method", generate_ping_factory_method),
             ("clean_string", clean_string),
         ),
     )
@@ -160,9 +151,6 @@ def output_go(
         print("❌ No pings with metrics found." + PING_METRIC_ERROR_MSG)
         return
 
-    print(ping_to_metrics)
-    print(ping_to_metrics["go-ping-one"])
-    print(ping_to_metrics["two-ping-go"])
     extension = ".go"
     filepath = output_dir / ("server_events" + extension)
     with filepath.open("w", encoding="utf-8") as fd:
