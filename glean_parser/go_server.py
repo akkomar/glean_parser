@@ -60,7 +60,7 @@ def generate_metric_type(metric_type: str) -> str:
     elif metric_type == "string":
         return "string"
     else:
-        print("❌ Unable to generate Go type from metric type: " + metric.type)
+        print("❌ Unable to generate Go type from metric type: " + metric_type)
         exit
 
 
