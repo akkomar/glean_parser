@@ -12,7 +12,6 @@ metric:
     lifetime: application
     send_in_pings:
       - events
-      - server-action
     notification_emails:
       - CHANGE-ME@example.com
     bugs:
@@ -29,7 +28,6 @@ metric:
     lifetime: application
     send_in_pings:
       - events
-      - server-action
     notification_emails:
       - CHANGE-ME@example.com
     bugs:
@@ -51,11 +49,15 @@ backend:
       - fake@fake.com
     expires: never
     extra_keys:
-      event_field_1:
+      event_field_string:
         description: >
-          A first extra field
+          A string extra field
         type: string
-      event_field_2:
+      event_field_quantity:
         description: >
-          A second extra field
-        type: string
+          A quantity extra field
+        type: quantity
+      event_field_bool:
+        description: >
+          A boolean extra field
+        type: boolean

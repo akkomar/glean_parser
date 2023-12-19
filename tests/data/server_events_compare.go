@@ -37,10 +37,10 @@ type RequestInfo struct {
 	IpAddress string
 }
 
-// TODO: verify with data team what defaults make sense for user agent / ip address if they are not supplied
+// deafult empty values will be omitted in json from ping struct definition
 var defaultRequestInfo = RequestInfo{
-	UserAgent: "Unknown",
-	IpAddress: "Unknown",
+	UserAgent: "",
+	IpAddress: "",
 }
 
 // structs to construct the glean ping
@@ -66,8 +66,8 @@ type ping struct {
 	DocumentType      string `json:"document_type"`
 	DocumentVersion   string `json:"document_version"`
 	DocumentID        string `json:"document_id"`
-	UserAgent         string `json:"user_agent"`
-	IpAddress         string `json:"ip_address"`
+	UserAgent         string `json:"user_agent,omitempty"`
+	IpAddress         string `json:"ip_address,omitempty"`
 	Payload           string `json:"payload"`
 }
 
@@ -81,16 +81,16 @@ type pingPayload struct {
 }
 
 type gleanEvent struct {
-	Category  string     `json:"category"`
-	Name      string     `json:"name"`
-	Timestamp int64      `json:"timestamp"`
-	Extra     [][]string `json:"extra"`
+	Category  string          `json:"category"`
+	Name      string          `json:"name"`
+	Timestamp int64           `json:"timestamp"`
+	Extra     [][]interface{} `json:"extra"`
 }
 
 func (g GleanEventsLogger) createClientInfo() clientInfo {
 	// Fields with default values are required in the Glean schema, but not used in server context
 	return clientInfo{
-		TelemetrySDKBuild: "{glean_parser_version}",
+		TelemetrySDKBuild: "{current_version}",
 		FirstRunDate:      "Unknown",
 		OS:                "Unknown",
 		OSVersion:         "Unknown",
@@ -102,10 +102,7 @@ func (g GleanEventsLogger) createClientInfo() clientInfo {
 }
 
 func createPingInfo() pingInfo {
-	// TODO: confirm expected date format in logs,
-	// js uses Date().toISOString(), ex. "2023-12-13T20:21:55.390Z"
-	// ruby uses Time.now.utc, ex. "2023-12-13 20:21:02 UTC"
-	var now = time.Now().UTC().Format("2006-01-02 15:04:05 MST")
+	var now = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	return pingInfo{
 		Seq:       0,
 		StartTime: now,
@@ -126,7 +123,7 @@ func (g GleanEventsLogger) createPing(documentType string, config RequestInfo, p
 	}
 }
 
-// method called by each event or custom ping method
+// method called by each event method
 func (g GleanEventsLogger) record(
 	documentType string,
 	requestInfo RequestInfo,
@@ -157,40 +154,12 @@ func (g GleanEventsLogger) record(
 	g.Logger.log(gleanEventMozlogType, string(pingJson))
 }
 
-type PingServerAction struct {
-  MetricName string // Test string metric
-  MetricRequestCount int64 // Test quantity metric
-}
-
-// Record and submit a PingServerAction custon Ping
-func (g GleanEventsLogger) RecordPingServerAction(
-	requestInfo RequestInfo,
-	params PingServerAction,
-) {
-	var metrics = metrics{
-    "string": {
-      "metric.name": params.MetricName,
-    },
-    "quantity": {
-      "metric.request_count": params.MetricRequestCount,
-    },
-	}
-	var events = []gleanEvent{}
-	g.record("server-action", requestInfo, metrics, events)
-}
-
-// Record and submit a PingServerAction custon Ping omitting user request info
-func (g GleanEventsLogger) RecordPingServerActionWithoutUserInfo(
-	params PingServerAction,
-) {
-	g.RecordPingServerAction(defaultRequestInfo, params)
-}
-
 type EventBackendTestEvent struct {
   MetricName string // Test string metric
   MetricRequestCount int64 // Test quantity metric
-  EventField1 string // A first extra field
-  EventField2 string // A second extra field
+  EventFieldString string // A string extra field
+  EventFieldQuantity int64 // A quantity extra field
+  EventFieldBool bool // A boolean extra field
 }
 
 // Record and submit an EventBackendTestEvent event.
@@ -207,9 +176,10 @@ func (g GleanEventsLogger) RecordEventBackendTestEvent(
       "metric.request_count": params.MetricRequestCount,
     },
 	}
-	var extraKeys = [][]string{
-    {"event_field_1", params.EventField1},
-    {"event_field_2", params.EventField2},
+	var extraKeys = [][]interface{}{
+    {"event_field_string", params.EventFieldString},
+    {"event_field_quantity", params.EventFieldQuantity},
+    {"event_field_bool", params.EventFieldBool},
 	}
 	var events = []gleanEvent{
 		gleanEvent{

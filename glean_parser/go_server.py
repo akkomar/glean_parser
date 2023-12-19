@@ -20,8 +20,6 @@ see `SUPPORTED_METRIC_TYPES` below.
 The generated code creates the following:
 * Two methods for logging an Event metric
     one with and one without user request info specified
-* Two methods for logging a custom ping
-    one with and one without user request info specified
 """
 from collections import defaultdict
 from pathlib import Path
@@ -61,6 +59,8 @@ def generate_metric_type(metric_type: str) -> str:
         return "int64"
     elif metric_type == "string":
         return "string"
+    elif metric_type == "boolean":
+        return "bool"
     else:
         print("❌ Unable to generate Go type from metric type: " + metric_type)
         exit
@@ -99,7 +99,16 @@ def output_go(
         ),
     )
 
-    event_metric_exists = False
+    # In this environment we don't use a concept of measurement window for collecting
+    # metrics. Only "events as pings" are supported.
+    PING_METRIC_ERROR_MSG = (
+        " Server-side environment is simplified and only supports the events ping type."
+        + " You should not be including pings.yaml with your parser call"
+        + " or referencing any other pings in your metric configuration."
+    )
+    if "pings" in objs:
+        print("❌ Ping definition found." + PING_METRIC_ERROR_MSG)
+        return
 
     # Go through all metrics in objs and build a map of
     # ping->list of metric categories->list of metrics
@@ -116,41 +125,22 @@ def output_go(
                         + " metric type."
                     )
                     continue
-                if metric.type == "event":
-                    # This is used in the template - generated code is slightly
-                    # different when event metric type is used.
-                    event_metric_exists = True
                 for ping in metric.send_in_pings:
+                    if ping != "events":
+                        (
+                            print(
+                                "❌ Non-events ping reference found."
+                                + PING_METRIC_ERROR_MSG
+                                + f"Ignoring the {ping} ping type."
+                            )
+                        )
+                        continue
                     metrics_by_type = ping_to_metrics[ping]
                     metrics_list = metrics_by_type.setdefault(metric.type, [])
                     metrics_list.append(metric)
 
-    PING_METRIC_ERROR_MSG = (
-        " Server-side environment is simplified and this"
-        + " parser doesn't generate individual metric files. Make sure to pass all"
-        + " your ping and metric definitions in a single invocation of the parser."
-    )
-    if "pings" not in objs:
-        # If events are meant to be sent in custom pings, we need to make sure they
-        # are defined. Otherwise we won't have destination tables defined and
-        # submissions won't pass validation at ingestion.
-        if event_metric_exists:
-            if "events" not in ping_to_metrics:
-                # Event metrics can be sent in standard `events` ping
-                # or in custom pings.
-                print(
-                    "❌ "
-                    + PING_METRIC_ERROR_MSG
-                    + "\n You need to either send your event metrics in standard"
-                    + " `events` ping or define a custom one."
-                )
-                return
-        else:
-            print("❌ No ping definition found." + PING_METRIC_ERROR_MSG)
-            return
-
-    if not ping_to_metrics:
-        print("❌ No pings with metrics found." + PING_METRIC_ERROR_MSG)
+    if "event" not in ping_to_metrics["events"]:
+        print("❌ No event metrics found...at least one event metric is required")
         return
 
     extension = ".go"
@@ -159,7 +149,6 @@ def output_go(
         fd.write(
             template.render(
                 parser_version=__version__,
-                pings=ping_to_metrics,
-                event_metric_exists=event_metric_exists
+                events_ping=ping_to_metrics["events"]
             )
         )

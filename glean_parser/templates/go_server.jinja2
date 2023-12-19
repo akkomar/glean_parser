@@ -38,10 +38,10 @@ type RequestInfo struct {
 	IpAddress string
 }
 
-// TODO: verify with data team what defaults make sense for user agent / ip address if they are not supplied
+// deafult empty values will be omitted in json from ping struct definition
 var defaultRequestInfo = RequestInfo{
-	UserAgent: "Unknown",
-	IpAddress: "Unknown",
+	UserAgent: "",
+	IpAddress: "",
 }
 
 // structs to construct the glean ping
@@ -67,8 +67,8 @@ type ping struct {
 	DocumentType      string `json:"document_type"`
 	DocumentVersion   string `json:"document_version"`
 	DocumentID        string `json:"document_id"`
-	UserAgent         string `json:"user_agent"`
-	IpAddress         string `json:"ip_address"`
+	UserAgent         string `json:"user_agent,omitempty"`
+	IpAddress         string `json:"ip_address,omitempty"`
 	Payload           string `json:"payload"`
 }
 
@@ -82,16 +82,16 @@ type pingPayload struct {
 }
 
 type gleanEvent struct {
-	Category  string     `json:"category"`
-	Name      string     `json:"name"`
-	Timestamp int64      `json:"timestamp"`
-	Extra     [][]string `json:"extra"`
+	Category  string          `json:"category"`
+	Name      string          `json:"name"`
+	Timestamp int64           `json:"timestamp"`
+	Extra     [][]interface{} `json:"extra"`
 }
 
 func (g GleanEventsLogger) createClientInfo() clientInfo {
 	// Fields with default values are required in the Glean schema, but not used in server context
 	return clientInfo{
-		TelemetrySDKBuild: "{glean_parser_version}",
+		TelemetrySDKBuild: "glean_parser v{{ parser_version }}",
 		FirstRunDate:      "Unknown",
 		OS:                "Unknown",
 		OSVersion:         "Unknown",
@@ -103,10 +103,8 @@ func (g GleanEventsLogger) createClientInfo() clientInfo {
 }
 
 func createPingInfo() pingInfo {
-	// TODO: confirm expected date format in logs,
-	// js uses Date().toISOString(), ex. "2023-12-13T20:21:55.390Z"
-	// ruby uses Time.now.utc, ex. "2023-12-13 20:21:02 UTC"
-	var now = time.Now().UTC().Format("2006-01-02 15:04:05 MST")
+	{# times are ISO-8601 strings, e.g. "2023-12-19T22:09:17.440Z" #}
+	var now = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	return pingInfo{
 		Seq:       0,
 		StartTime: now,
@@ -127,7 +125,7 @@ func (g GleanEventsLogger) createPing(documentType string, config RequestInfo, p
 	}
 }
 
-// method called by each event or custom ping method
+// method called by each event method
 func (g GleanEventsLogger) record(
 	documentType string,
 	requestInfo RequestInfo,
@@ -158,54 +156,9 @@ func (g GleanEventsLogger) record(
 	g.Logger.log(gleanEventMozlogType, string(pingJson))
 }
 
-{% for ping, metrics_by_type in pings.items() %}
-{% if ping != "events" %}
-type {{ ping|ping_type_name }} struct {
-  {% for metric_type, metrics in metrics_by_type.items() %}
-  {% if metric_type != 'event' %}
-  {% for metric in metrics %}
-  {{ metric|metric_argument_name }} {{ metric.type|go_metric_type }} // {{ metric.description|clean_string }}
-  {% endfor %}
-  {% endif %}
-  {% endfor %}
-	{# TODO: if custom pings need to support including any event metric #}
-}
-
-// Record and submit a {{ ping|ping_type_name }} custon Ping
-func (g GleanEventsLogger) Record{{ ping|ping_type_name }}(
-	requestInfo RequestInfo,
-	params {{ ping|ping_type_name }},
-) {
-	var metrics = metrics{
-    {% for metric_type, metrics in metrics_by_type.items() %}
-    {% if metric_type != 'event' %}
-    "{{ metric_type }}": {
-    {% for metric in metrics %}
-      "{{ metric|metric_name }}": params.{{ metric|metric_argument_name }},
-    {% endfor %}
-    },
-    {% endif %}
-    {% endfor %}
-	}
-	var events = []gleanEvent{}
-	g.record("{{ ping }}", requestInfo, metrics, events)
-}
-
-// Record and submit a {{ ping|ping_type_name }} custon Ping omitting user request info
-func (g GleanEventsLogger) Record{{ ping|ping_type_name }}WithoutUserInfo(
-	params {{ ping|ping_type_name }},
-) {
-	g.Record{{ ping|ping_type_name }}(defaultRequestInfo, params)
-}
-
-{% endif %}
-{% endfor %}
-{% if event_metric_exists %}
-{# methods for sending individual event metrics #}
-{% for ping, metrics_by_type in pings.items() %}
-{% for event in metrics_by_type["event"] %}
+{% for event in events_ping["event"] %}
 type {{ event|event_type_name }} struct {
-  {% for metric_type, metrics in metrics_by_type.items() %}
+  {% for metric_type, metrics in events_ping.items() %}
   {% if metric_type != 'event' %}
   {% for metric in metrics %}
   {{ metric|metric_argument_name }} {{ metric.type|go_metric_type }} // {{ metric.description|clean_string }}
@@ -224,7 +177,7 @@ func (g GleanEventsLogger) Record{{ event|event_type_name }}(
 	params {{ event|event_type_name }},
 ) {
 	var metrics = metrics{
-    {% for metric_type, metrics in metrics_by_type.items() %}
+    {% for metric_type, metrics in events_ping.items() %}
     {% if metric_type != 'event' %}
     "{{ metric_type }}": {
     {% for metric in metrics %}
@@ -234,7 +187,7 @@ func (g GleanEventsLogger) Record{{ event|event_type_name }}(
     {% endif %}
     {% endfor %}
 	}
-	var extraKeys = [][]string{
+	var extraKeys = [][]interface{}{
     {% for extra, metadata in event.extra_keys.items() %}
     {"{{ extra }}", params.{{ extra|event_extra_name }}},
     {% endfor %}
@@ -259,5 +212,3 @@ func (g GleanEventsLogger) Record{{ event|event_type_name }}WithoutUserInfo(
 }
 
 {% endfor %}
-{% endfor %}
-{% endif %}

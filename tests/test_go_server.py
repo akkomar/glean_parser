@@ -4,14 +4,9 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from pathlib import Path
-import io
-import json
-import pytest
-import subprocess
 
 import glean_parser
 from glean_parser import translate
-from glean_parser import validate_ping
 
 ROOT = Path(__file__).parent
 
@@ -21,7 +16,7 @@ def test_parser_go_server_ping_no_metrics(tmpdir, capsys):
     tmpdir = Path(str(tmpdir))
 
     translate.translate(
-        ROOT / "data" / "go_server_pings.yaml",
+        ROOT / "data" / "server_pings.yaml",
         "go_server",
         tmpdir,
     )
@@ -29,9 +24,26 @@ def test_parser_go_server_ping_no_metrics(tmpdir, capsys):
     assert all(False for _ in tmpdir.iterdir())
 
 
-def test_parser_go_server_metrics_no_ping(tmpdir):
+def test_parser_go_server_ping_file(tmpdir, capsys):
+    """Test that no files are generated if ping definitions
+    are provided."""
+    tmpdir = Path(str(tmpdir))
+
+    translate.translate(
+        [
+            ROOT / "data" / "server_metrics_with_event.yaml",
+            ROOT / "data" / "server_pings.yaml",
+        ],
+        "go_server",
+        tmpdir,
+    )
+    captured = capsys.readouterr()
+    assert all(False for _ in tmpdir.iterdir())
+
+
+def test_parser_go_server_metrics_no_ping(tmpdir, capsys):
     """Test that no files are generated if only metric definitions
-    are provided without pings."""
+    are provided without any events metrics."""
     tmpdir = Path(str(tmpdir))
 
     translate.translate(
@@ -40,8 +52,11 @@ def test_parser_go_server_metrics_no_ping(tmpdir):
         tmpdir,
     )
 
+    captured = capsys.readouterr()
     assert all(False for _ in tmpdir.iterdir())
-
+    assert (
+        "No event metrics found...at least one event metric is required" in captured.out
+    )
 
 def test_parser_go_server_metrics_unsupported_type(tmpdir, capsys):
     """Test that no files are generated with unsupported metric types."""
@@ -75,10 +90,7 @@ def test_parser_go_server(tmpdir):
     tmpdir = Path(str(tmpdir))
 
     translate.translate(
-        [
-            ROOT / "data" / "go_server_metrics.yaml",
-            ROOT / "data" / "go_server_pings.yaml"
-        ],
+        ROOT / "data" / "go_server_metrics.yaml",
         "go_server",
         tmpdir,
     )
