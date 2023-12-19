@@ -10,6 +10,7 @@ from glean_parser import translate
 
 ROOT = Path(__file__).parent
 
+
 def test_parser_go_server_ping_no_metrics(tmpdir, capsys):
     """Test that no files are generated if only ping definitions
     are provided without any metrics."""
@@ -20,7 +21,6 @@ def test_parser_go_server_ping_no_metrics(tmpdir, capsys):
         "go_server",
         tmpdir,
     )
-    captured = capsys.readouterr()
     assert all(False for _ in tmpdir.iterdir())
 
 
@@ -37,7 +37,6 @@ def test_parser_go_server_ping_file(tmpdir, capsys):
         "go_server",
         tmpdir,
     )
-    captured = capsys.readouterr()
     assert all(False for _ in tmpdir.iterdir())
 
 
@@ -57,6 +56,7 @@ def test_parser_go_server_metrics_no_ping(tmpdir, capsys):
     assert (
         "No event metrics found...at least one event metric is required" in captured.out
     )
+
 
 def test_parser_go_server_metrics_unsupported_type(tmpdir, capsys):
     """Test that no files are generated with unsupported metric types."""
@@ -79,7 +79,7 @@ def test_parser_go_server_metrics_unsupported_type(tmpdir, capsys):
         "timespan",
         "uuid",
         "url",
-        "datetime"
+        "datetime",
     ]
     for t in unsupported_types:
         assert t in captured.out

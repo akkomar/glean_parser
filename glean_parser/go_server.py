@@ -38,10 +38,6 @@ def generate_event_type_name(metric: metrics.Metric) -> str:
     return f"Event{util.Camelize(metric.category)}{util.Camelize(metric.name)}"
 
 
-def generate_ping_type_name(ping_name: str) -> str:
-    return f"Ping{util.Camelize(ping_name)}"
-
-
 def generate_metric_name(metric: metrics.Metric) -> str:
     return f"{metric.category}.{metric.name}"
 
@@ -64,6 +60,7 @@ def generate_metric_type(metric_type: str) -> str:
     else:
         print("❌ Unable to generate Go type from metric type: " + metric_type)
         exit
+        return "NONE"
 
 
 def clean_string(s: str) -> str:
@@ -71,9 +68,7 @@ def clean_string(s: str) -> str:
 
 
 def output_go(
-    objs: metrics.ObjectTree,
-    output_dir: Path,
-    options: Optional[Dict[str, Any]]
+    objs: metrics.ObjectTree, output_dir: Path, options: Optional[Dict[str, Any]]
 ) -> None:
     """
     Given a tree of objects, output Go code to `output_dir`.
@@ -91,7 +86,6 @@ def output_go(
         filters=(
             ("event_type_name", generate_event_type_name),
             ("event_extra_name", generate_extra_name),
-            ("ping_type_name", generate_ping_type_name),
             ("metric_name", generate_metric_name),
             ("metric_argument_name", generate_metric_argument_name),
             ("go_metric_type", generate_metric_type),
@@ -148,7 +142,6 @@ def output_go(
     with filepath.open("w", encoding="utf-8") as fd:
         fd.write(
             template.render(
-                parser_version=__version__,
-                events_ping=ping_to_metrics["events"]
+                parser_version=__version__, events_ping=ping_to_metrics["events"]
             )
         )

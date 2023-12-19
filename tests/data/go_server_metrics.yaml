@@ -34,7 +34,7 @@ metric:
       - https://bugzilla.mozilla.org/1
     data_reviews:
       - http://example.com/reviews
-    expires: never    
+    expires: never
 
 backend:
   test_event:
