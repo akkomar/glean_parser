@@ -9,6 +9,7 @@ package glean
 
 // required imports
 import (
+    "fmt"
 	"encoding/json"
 	"time"
 
@@ -18,18 +19,18 @@ import (
 // log type string used to identify logs to process in the Moz Data Pipeline
 var gleanEventMozlogType string = "glean-server-event"
 
-// interface to send the log messages, accepting a call passing in the eventType and the message.
-// TODO: confirm what calls to cloud logging would be required to see if the log method signature makes sense
-// TODO: confirm if this should depend on https://github.com/mozilla-services/go-mozlog
-type Logger interface {
-	log(eventType string, message string)
+
+// TODO: confirm envelope schema and assemble this json in a nicer way
+// TODO: decide how to log - stdout, mozlog, etc, is there a standard way for new go services in gcpv2?
+func logEvent(eventType string, message string) {
+	fmt.Printf("{\"Type\": \"%s\", \"Fields\": %s\n", eventType, message)
 }
+
 
 type GleanEventsLogger struct {
 	AppID             string
 	AppDisplayVersion string
 	AppChannel        string
-	Logger            Logger
 }
 
 // exported type for public method parameters
@@ -153,7 +154,7 @@ func (g GleanEventsLogger) record(
 	if err != nil {
 		panic("Unable to marshal ping to json")
 	}
-	g.Logger.log(gleanEventMozlogType, string(pingJson))
+	logEvent(gleanEventMozlogType, string(pingJson))
 }
 
 {% for event in events_ping["event"] %}
